@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>HITSTER</title>
+  <style>
+    /* ════════════════════════════════════════════════
+       RESET + BASE
+    ════════════════════════════════════════════════ */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+      color: #fff;
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    }
+
+    /* ════════════════════════════════════════════════
+       SISTEMA DE PANTALLAS
+       Todas son position:fixed inset:0.
+       La visible tiene opacity:1 + pointer-events:auto.
+    ════════════════════════════════════════════════ */
+    .screen {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      transition: opacity 0.35s ease;
+      background: #000;
+    }
+
+    .screen.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* ════════════════════════════════════════════════
+       PANTALLA 1 — CARGANDO
+    ════════════════════════════════════════════════ */
+    #screen-loading { z-index: 10; }
+
+    .spinner {
+      width: 44px;
+      height: 44px;
+      border: 3px solid #222;
+      border-top-color: #FFD700;
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ════════════════════════════════════════════════
+       PANTALLA 2 — INICIO / PERMISOS
+       El botón "EMPEZAR JUEGO" hace tres cosas:
+         1. Carga el iframe con autoplay=1
+         2. Pide permiso DeviceOrientation en iOS
+         3. Activa el listener del giroscopio
+    ════════════════════════════════════════════════ */
+    #screen-portrait { z-index: 3; }
+
+    .logo-hitster {
+      font-size: 42px;
+      font-weight: 900;
+      letter-spacing: 6px;
+      color: #FFD700;
+      text-shadow: 0 0 40px rgba(255,215,0,0.30);
+      margin-bottom: 6px;
+    }
+
+    .logo-sub {
+      font-size: 11px;
+      letter-spacing: 4px;
+      color: #444;
+      text-transform: uppercase;
+      margin-bottom: 36px;
+    }
+
+    /* Icono animado de voltear */
+    .flip-icon-wrap {
+      width: 80px;
+      height: 80px;
+      margin-bottom: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .flip-icon-wrap .phone {
+      font-size: 54px;
+      line-height: 1;
+      display: block;
+      animation: phoneFlip 3s ease-in-out infinite;
+      transform-origin: center center;
+    }
+
+    @keyframes phoneFlip {
+      0%   { transform: rotate(0deg)   scale(1);   }
+      25%  { transform: rotate(0deg)   scale(1.05); }
+      55%  { transform: rotate(180deg) scale(1.05); }
+      80%  { transform: rotate(180deg) scale(1);   }
+      100% { transform: rotate(0deg)   scale(1);   }
+    }
+
+    #portrait-instruction {
+      font-size: 18px;
+      font-weight: 600;
+      color: #ccc;
+      text-align: center;
+      line-height: 1.55;
+      max-width: 280px;
+      margin-bottom: 10px;
+    }
+
+    #portrait-sub {
+      font-size: 13px;
+      color: #444;
+      text-align: center;
+      line-height: 1.5;
+      max-width: 260px;
+      margin-bottom: 38px;
+    }
+
+    /* Boton principal */
+    #btn-start {
+      background: #FFD700;
+      color: #000;
+      border: none;
+      border-radius: 14px;
+      padding: 17px 44px;
+      font-size: 15px;
+      font-weight: 900;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: transform 0.1s ease;
+    }
+
+    #btn-start:active  { transform: scale(0.95); }
+    #btn-start:disabled {
+      opacity: 0.5;
+      cursor: default;
+      transform: none;
+    }
+
+    #btn-start.pulsing {
+      animation: startPulse 1.8s ease-in-out infinite;
+    }
+
+    @keyframes startPulse {
+      0%, 100% { box-shadow: 0 0 0 0   rgba(255,215,0,0.45); }
+      50%       { box-shadow: 0 0 0 16px rgba(255,215,0,0);    }
+    }
+
+    /* Indicador de estado del sensor */
+    #sensor-status {
+      margin-top: 18px;
+      font-size: 12px;
+      color: #555;
+      text-align: center;
+      min-height: 18px;
+      line-height: 1.5;
+      max-width: 260px;
+      transition: color 0.3s;
+    }
+
+    #sensor-status.active  { color: #2ecc71; }
+    #sensor-status.waiting { color: #FFD700; }
+    #sensor-status.error   { color: #e74c3c; }
+
+    /* ════════════════════════════════════════════════
+       PANTALLA 3 — REPRODUCTOR (boca abajo)
+    ════════════════════════════════════════════════ */
+    #screen-landscape {
+      flex-direction: row;
+      gap: 0;
+      padding: 0;
+      z-index: 1;
+    }
+
+    #player-zone {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: #000;
+    }
+
+    /* El SDK de Spotify inyecta un <iframe> dentro de este div.
+       Damos dimensiones al div contenedor y al iframe hijo. */
+    #spotify-iframe {
+      width: 100%;
+      max-width: 400px;
+    }
+
+    #spotify-iframe iframe {
+      width: 100% !important;
+      height: 152px !important;
+      border: none !important;
+      border-radius: 12px !important;
+    }
+
+    #action-zone {
+      width: 110px;
+      min-width: 110px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      background: #0d0d0d;
+      height: 100%;
+      padding: 16px 8px;
+      border-left: 1px solid #1a1a1a;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 13px 6px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 1.8px;
+      text-transform: uppercase;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: transform 0.1s ease, opacity 0.15s ease;
+    }
+
+    .btn:active { transform: scale(0.93); }
+
+    .btn-reveal {
+      background: #FFD700;
+      color: #000;
+    }
+
+    .btn-next {
+      background: #1a1a1a;
+      color: #999;
+      border: 1px solid #2a2a2a;
+    }
+
+    /* ════════════════════════════════════════════════
+       PANTALLA 4 — REVELACION (overlay)
+    ════════════════════════════════════════════════ */
+    #screen-reveal {
+      z-index: 5;
+      text-align: center;
+      background: #050505;
+      gap: 0;
+    }
+
+    #reveal-year {
+      font-size: 100px;
+      font-weight: 900;
+      color: #FFD700;
+      line-height: 1;
+      letter-spacing: -4px;
+      text-shadow: 0 0 60px rgba(255, 215, 0, 0.25);
+      animation: revealPop 0.45s cubic-bezier(0.34,1.56,0.64,1) both;
+    }
+
+    @keyframes revealPop {
+      from { transform: scale(0.55); opacity: 0; }
+      to   { transform: scale(1);    opacity: 1; }
+    }
+
+    #reveal-artist {
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+      margin-top: 20px;
+      max-width: 320px;
+      line-height: 1.3;
+    }
+
+    #reveal-title {
+      font-size: 17px;
+      font-weight: 400;
+      color: #888;
+      margin-top: 8px;
+      font-style: italic;
+      max-width: 320px;
+      line-height: 1.4;
+    }
+
+    .btn-back {
+      margin-top: 36px;
+      background: #1a1a1a;
+      color: #999;
+      border: 1px solid #2a2a2a;
+      padding: 13px 30px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    .btn-back:active { opacity: 0.7; }
+
+    /* ════════════════════════════════════════════════
+       PANTALLA 5 — ERROR 404
+    ════════════════════════════════════════════════ */
+    #screen-404 {
+      z-index: 10;
+      text-align: center;
+      gap: 14px;
+    }
+
+    #screen-404 .err-code {
+      font-size: 90px;
+      font-weight: 900;
+      color: #e74c3c;
+      line-height: 1;
+    }
+
+    #screen-404 h2 { font-size: 22px; font-weight: 700; }
+
+    #screen-404 p {
+      font-size: 13px;
+      color: #555;
+      font-family: monospace;
+      background: #111;
+      padding: 6px 12px;
+      border-radius: 6px;
+    }
+
+    .btn-scan {
+      background: #c0392b;
+      color: #fff;
+      padding: 14px 28px;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      margin-top: 6px;
+      transition: transform 0.1s;
+    }
+
+    .btn-scan:active { transform: scale(0.95); }
+
+    /* ════════════════════════════════════════════════
+       HINT "VUELVE BOCA ARRIBA" (banner flotante)
+       Aparece sobre el reproductor como recordatorio
+    ════════════════════════════════════════════════ */
+    #face-down-hint {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 4;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      padding: 14px 20px;
+      text-align: center;
+      font-size: 13px;
+      color: #666;
+      border-top: 1px solid #1a1a1a;
+      transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+
+    #face-down-hint.hidden {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(100%);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ════════════════════════════════════════
+       PANTALLA 1 — Cargando
+  ════════════════════════════════════════ -->
+  <div id="screen-loading" class="screen">
+    <div class="spinner"></div>
+  </div>
+
+
+  <!-- ════════════════════════════════════════
+       PANTALLA 2 — Inicio + solicitud de permisos
+  ════════════════════════════════════════ -->
+  <div id="screen-portrait" class="screen hidden">
+
+    <div class="logo-hitster">HITSTER</div>
+    <div class="logo-sub">Adivina el año</div>
+
+    <div class="flip-icon-wrap">
+      <span class="phone">📱</span>
+    </div>
+
+    <div id="portrait-instruction">
+      Pon el teléfono<br><strong>boca abajo</strong> para escuchar
+    </div>
+    <div id="portrait-sub">
+      La música empieza cuando<br>la pantalla mira hacia la mesa
+    </div>
+
+    <button id="btn-start" class="pulsing" onclick="activarTodo()">
+      Empezar&nbsp;juego
+    </button>
+
+    <div id="sensor-status"></div>
+
+  </div>
+
+
+  <!-- ════════════════════════════════════════
+       PANTALLA 3 — Reproductor (boca abajo)
+  ════════════════════════════════════════ -->
+  <div id="screen-landscape" class="screen hidden">
+    <div id="player-zone">
+      <!-- El SDK de Spotify iFrame API sustituye este div
+           por un iframe real cuando se llama createController() -->
+      <div id="spotify-iframe"></div>
+    </div>
+    <div id="action-zone">
+      <button class="btn btn-reveal" onclick="showReveal()">Revelar</button>
+      <button class="btn btn-next"   onclick="showDone()">Siguiente</button>
+    </div>
+  </div>
+
+
+  <!-- ════════════════════════════════════════
+       PANTALLA 4 — Revelacion (overlay)
+  ════════════════════════════════════════ -->
+  <div id="screen-reveal" class="screen hidden">
+    <div id="reveal-year"></div>
+    <div id="reveal-artist"></div>
+    <div id="reveal-title"></div>
+    <button class="btn-back" onclick="hideReveal()">← Escuchar de nuevo</button>
+  </div>
+
+
+  <!-- ════════════════════════════════════════
+       PANTALLA 5 — Error 404
+  ════════════════════════════════════════ -->
+  <div id="screen-404" class="screen hidden">
+    <div class="err-code">404</div>
+    <h2>Cancion no encontrada</h2>
+    <p id="err-msg">ID desconocido</p>
+    <button class="btn-scan" onclick="history.back()">← Escanear otra tarjeta</button>
+  </div>
+
+
+  <!-- Banner flotante (no es una pantalla) -->
+  <div id="face-down-hint" class="hidden">
+    🔄 Levanta el movil para pausar
+  </div>
+
+
+  <script>
+    'use strict';
+
+    /* ═══════════════════════════════════════════════════════
+       CONFIGURACION
+    ═══════════════════════════════════════════════════════ */
+    const DATA_URL      = 'canciones.json';
+    const UMBRAL_ABAJO  = 150;   // |beta| grados para activar "boca abajo"
+    const UMBRAL_ARRIBA = 100;   // |beta| grados para volver "boca arriba" (histéresis)
+
+    /* ═══════════════════════════════════════════════════════
+       ESTADO GLOBAL
+    ═══════════════════════════════════════════════════════ */
+    let songs        = {};
+    let currentSong  = null;
+    let spotifyId    = null;
+    let iframeSrc    = '';
+    let revealed     = false;
+    let juegoActivo  = false;
+    let bocaAbajo    = false;
+    let sensorActivo = false;
+
+    // Referencia al controlador del Spotify iFrame API
+    let embedController = null;
+    let embedListo      = false;   // true cuando el SDK ha cargado el track
+
+    /* ═══════════════════════════════════════════════════════
+       SPOTIFY iFRAME API
+       Documentacion: https://developer.spotify.com/documentation/embeds/references/iframe-api
+       El SDK llama a window.onSpotifyIframeApiReady() cuando
+       está disponible. Desde ahi creamos el controlador.
+    ═══════════════════════════════════════════════════════ */
+    window.onSpotifyIframeApiReady = function(IFrameAPI) {
+      var element = document.getElementById('spotify-iframe');
+      var options = {
+        uri:    'spotify:track:' + spotifyId,
+        width:  '100%',
+        height: '152'
+      };
+
+      IFrameAPI.createController(element, options, function(controller) {
+        embedController = controller;
+
+        controller.addListener('ready', function() {
+          embedListo = true;
+          // Si el usuario ya volteo el movil antes de que cargara el SDK:
+          if (bocaAbajo && juegoActivo) {
+            controller.play();
+          }
+        });
+
+        controller.addListener('playback_update', function(e) {
+          // Podemos usar esto para depuracion si hace falta
+        });
+      });
+    };
+
+    /* ═══════════════════════════════════════════════════════
+       init()
+       Carga canciones.json y prepara la pantalla de inicio.
+       NO carga el SDK de Spotify todavia (esperamos al clic).
+    ═══════════════════════════════════════════════════════ */
+    async function init() {
+      var params = new URLSearchParams(window.location.search);
+      spotifyId  = params.get('id');
+
+      if (!spotifyId) {
+        return show404('No se encontro ningun parametro ?id= en la URL');
+      }
+
+      try {
+        var res = await fetch(DATA_URL);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        songs = await res.json();
+      } catch (e) {
+        return show404('No se pudo cargar ' + DATA_URL + ' — ' + e.message);
+      }
+
+      currentSong = songs[spotifyId];
+      if (!currentSong) {
+        return show404('ID "' + spotifyId + '" no existe en canciones.json');
+      }
+
+      showScreen('screen-portrait');
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       activarTodo()
+       Llamada desde onclick="activarTodo()" del boton.
+       Tres pasos dentro del mismo handler de clic:
+         1. Cargar el SDK de Spotify (inyectar <script>)
+         2. Pedir permiso DeviceOrientation en iOS
+         3. Activar listener del giroscopio
+    ═══════════════════════════════════════════════════════ */
+    async function activarTodo() {
+      if (juegoActivo) return;
+      juegoActivo = true;
+
+      var btn    = document.getElementById('btn-start');
+      var status = document.getElementById('sensor-status');
+
+      btn.disabled = true;
+      btn.classList.remove('pulsing');
+      btn.textContent = '...';
+
+      // ── PASO 1: inyectar SDK de Spotify ──────────────────
+      // Se hace aqui, dentro del handler de clic, para que
+      // el navegador asocie la carga del audio a un gesto
+      // del usuario y permita el autoplay.
+      cargarSDK();
+
+      // ── PASO 2: pedir permiso sensor (iOS 13+) ───────────
+      var permisoOk = await pedirPermisoSensor(status);
+
+      if (!permisoOk) {
+        status.textContent = 'Sin sensor — pon el movil boca abajo para escuchar';
+        status.className   = 'waiting';
+        btn.textContent    = 'Listo';
+        // Fallback: mostrar reproductor directamente
+        setTimeout(function() { mostrarReproductor(); }, 800);
+        return;
+      }
+
+      // ── PASO 3: activar giroscopio ────────────────────────
+      activarSensor();
+
+      btn.textContent    = 'Listo — pon el movil boca abajo';
+      status.textContent = '● Sensor activo';
+      status.className   = 'active';
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       cargarSDK()
+       Inyecta el script del Spotify iFrame API una sola vez.
+       Cuando carga, llama a window.onSpotifyIframeApiReady().
+    ═══════════════════════════════════════════════════════ */
+    var sdkCargado = false;
+    function cargarSDK() {
+      if (sdkCargado) return;
+      sdkCargado = true;
+      var s  = document.createElement('script');
+      s.src  = 'https://open.spotify.com/embed/iframe-api/v1';
+      s.async = true;
+      document.head.appendChild(s);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       pedirPermisoSensor()
+    ═══════════════════════════════════════════════════════ */
+    async function pedirPermisoSensor(statusEl) {
+      if (!window.DeviceOrientationEvent) {
+        statusEl.textContent = 'Este dispositivo no tiene sensor de orientacion';
+        statusEl.className   = 'error';
+        return false;
+      }
+
+      if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+        try {
+          statusEl.textContent = 'Solicitando permiso al sensor...';
+          statusEl.className   = 'waiting';
+          var resultado = await DeviceOrientationEvent.requestPermission();
+          if (resultado === 'granted') return true;
+          statusEl.textContent = 'Permiso denegado — ve a Ajustes > Safari > Movimiento';
+          statusEl.className   = 'error';
+          return false;
+        } catch (err) {
+          // Ya concedido anteriormente en esta sesion
+          console.warn('requestPermission:', err.message);
+          return true;
+        }
+      }
+
+      return true;  // Android / otros — no requieren permiso
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       activarSensor() / handleBocaAbajo()
+    ═══════════════════════════════════════════════════════ */
+    function activarSensor() {
+      if (sensorActivo) return;
+      sensorActivo = true;
+      window.addEventListener('deviceorientation', handleBocaAbajo, true);
+    }
+
+    function handleBocaAbajo(evento) {
+      var beta = evento.beta;
+      if (beta === null || beta === undefined) return;
+
+      var absBeta   = Math.abs(beta);
+      var ahoraBoca = absBeta > UMBRAL_ABAJO;
+
+      if (ahoraBoca && !bocaAbajo) {
+        bocaAbajo = true;
+        mostrarReproductor();
+      } else if (!ahoraBoca && absBeta < UMBRAL_ARRIBA && bocaAbajo) {
+        bocaAbajo = false;
+        pausarReproductor();
+      }
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       mostrarReproductor() / pausarReproductor()
+       Usan el embedController del SDK oficial.
+    ═══════════════════════════════════════════════════════ */
+    function mostrarReproductor() {
+      if (revealed) return;
+      showScreen('screen-landscape');
+      document.getElementById('face-down-hint').classList.remove('hidden');
+      // Llamar play() si el controlador ya esta listo,
+      // si no, onSpotifyIframeApiReady lo hara cuando cargue.
+      if (embedController && embedListo) {
+        embedController.play();
+      }
+    }
+
+    function pausarReproductor() {
+      if (revealed) return;
+      if (embedController) embedController.pause();
+      showScreen('screen-portrait');
+      document.getElementById('face-down-hint').classList.add('hidden');
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       showScreen()
+    ═══════════════════════════════════════════════════════ */
+    function showScreen(id) {
+      ['screen-loading','screen-portrait','screen-landscape',
+       'screen-reveal','screen-404'].forEach(function(s) {
+        document.getElementById(s).classList.toggle('hidden', s !== id);
+      });
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       showReveal()
+    ═══════════════════════════════════════════════════════ */
+    function showReveal() {
+      if (!currentSong) return;
+      revealed = true;
+
+      document.getElementById('reveal-year').textContent   = currentSong.año;
+      document.getElementById('reveal-artist').textContent = currentSong.artista;
+      document.getElementById('reveal-title').textContent  = currentSong.cancion;
+
+      var yearEl = document.getElementById('reveal-year');
+      yearEl.style.animation = 'none';
+      void yearEl.offsetWidth;
+      yearEl.style.animation = '';
+
+      document.getElementById('screen-landscape').classList.add('hidden');
+      document.getElementById('screen-reveal').classList.remove('hidden');
+      document.getElementById('face-down-hint').classList.add('hidden');
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       hideReveal()
+    ═══════════════════════════════════════════════════════ */
+    function hideReveal() {
+      revealed = false;
+      document.getElementById('screen-reveal').classList.add('hidden');
+
+      if (bocaAbajo) {
+        document.getElementById('screen-landscape').classList.remove('hidden');
+        document.getElementById('face-down-hint').classList.remove('hidden');
+        if (embedController && embedListo) embedController.play();
+      } else {
+        document.getElementById('screen-portrait').classList.remove('hidden');
+      }
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       showDone()
+    ═══════════════════════════════════════════════════════ */
+    function showDone() {
+      revealed     = false;
+      bocaAbajo    = false;
+      juegoActivo  = false;
+      sdkCargado   = false;
+      embedController = null;
+      embedListo   = false;
+
+      document.getElementById('spotify-iframe').innerHTML = '';
+      document.getElementById('face-down-hint').classList.add('hidden');
+
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        showScreen('screen-portrait');
+        document.getElementById('portrait-instruction').innerHTML =
+          'Bien jugado!<br><small style="font-weight:400;color:#555">Escanea la siguiente tarjeta</small>';
+        document.getElementById('portrait-sub').textContent = '';
+        var btn = document.getElementById('btn-start');
+        btn.disabled    = false;
+        btn.textContent = 'Empezar juego';
+        btn.classList.add('pulsing');
+        document.getElementById('sensor-status').textContent = '';
+        document.getElementById('sensor-status').className   = '';
+      }
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       show404()
+    ═══════════════════════════════════════════════════════ */
+    function show404(msg) {
+      document.getElementById('err-msg').textContent = msg;
+      showScreen('screen-404');
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       ARRANQUE
+    ═══════════════════════════════════════════════════════ */
+    init();
+  </script>
+</body>
+</html>
