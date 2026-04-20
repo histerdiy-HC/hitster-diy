@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Adivina la Canción - QR Scanner</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #121212;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        #reader {
+            width: 300px;
+            border-radius: 20px;
+            overflow: hidden;
+            border: 2px solid #1DB954;
+        }
+        .container {
+            text-align: center;
+            padding: 20px;
+        }
+        #player-container {
+            margin-top: 20px;
+            display: none; /* Se oculta hasta que escaneas */
+        }
+        .status {
+            margin-bottom: 10px;
+            color: #b3b3b3;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>🎵 Escanea y Adivina</h1>
+        <p class="status">Apunta al código QR para reproducir</p>
+        
+        <div id="reader"></div>
+
+        <div id="player-container">
+            <p>¡Reproduciendo! ¿Sabes cuál es?</p>
+            <iframe id="spotify-player" src="" width="300" height="80" frameborder="0" allowtransparency="true" allow="encrypted-media"></iframe>
+        </div>
+    </div>
+
+    <script>
+        function onScanSuccess(decodedText, decodedResult) {
+            // El link suele ser algo como: http://googleusercontent.com/spotify.com/TRACK_ID
+            // Extraemos el ID de la canción (el final de la URL)
+            const parts = decodedText.split('/');
+            const trackId = parts[parts.length - 1];
+
+            if (trackId) {
+                const player = document.getElementById('spotify-player');
+                const container = document.getElementById('player-container');
+                
+                // Cargamos el widget de Spotify
+                player.src = `https://open.spotify.com/embed/track/${trackId}`;
+                container.style.display = 'block';
+
+                // Pausamos el escáner para que no se vuelva loco
+                html5QrCode.stop();
+            }
+        }
+
+        const html5QrCode = new Html5Qrcode("reader");
+        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+        // Iniciar la cámara
+        html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess);
+    </script>
+</body>
+</html>
