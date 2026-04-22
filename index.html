@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HITHECTER — El Juego de Música</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;700;900&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+
+  <style>
+    :root {
+      --navy:      #05091a;
+      --navy-2:    #0a1230;
+      --blue:      #0d2fff;
+      --cyan:      #00e5ff;
+      --cyan-dim:  #00b8cc;
+      --glow:      rgba(0, 229, 255, 0.45);
+      --glow-lg:   rgba(0, 229, 255, 0.15);
+      --white:     #e8f4ff;
+      --font-head: 'Orbitron', sans-serif;
+      --font-body: 'Exo 2', sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--navy);
+      color: var(--white);
+      font-family: var(--font-body);
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow-x: hidden;
+    }
+
+    /* ─── BACKGROUND GRID ─── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,229,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,255,0.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ─── RADIAL GLOW ─── */
+    body::after {
+      content: '';
+      position: fixed;
+      top: -20%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 90vw;
+      height: 60vh;
+      background: radial-gradient(ellipse, rgba(0,80,255,0.18) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ─── HEADER / LOGO ─── */
+    header {
+      position: relative;
+      z-index: 10;
+      width: 100%;
+      padding: 24px 20px 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .logo-wrap {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    /* SVG Logo mark */
+    .logo-icon {
+      width: 54px;
+      height: 54px;
+      filter: drop-shadow(0 0 12px var(--cyan));
+    }
+
+    .logo-text {
+      font-family: var(--font-head);
+      font-size: clamp(1.6rem, 5vw, 2.4rem);
+      font-weight: 900;
+      letter-spacing: 0.06em;
+      background: linear-gradient(135deg, #ffffff 20%, var(--cyan) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: none;
+      filter: drop-shadow(0 0 18px var(--cyan));
+    }
+
+    .logo-sub {
+      font-family: var(--font-body);
+      font-weight: 700;
+      font-size: 0.62rem;
+      letter-spacing: 0.28em;
+      color: var(--cyan-dim);
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    /* ─── MAIN WRAPPER ─── */
+    main {
+      position: relative;
+      z-index: 10;
+      width: 100%;
+      max-width: 480px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0 20px 40px;
+    }
+
+    /* ─── SCREEN SYSTEM ─── */
+    .screen { display: none; width: 100%; flex-direction: column; align-items: center; }
+    .screen.active { display: flex; }
+
+    /* ─── LANDING SCREEN ─── */
+    #screen-landing {
+      gap: 28px;
+      padding-top: 10px;
+      animation: fadeUp 0.5s ease both;
+    }
+
+    .hero-card {
+      width: 100%;
+      background: linear-gradient(145deg, rgba(0,229,255,0.07) 0%, rgba(13,47,255,0.12) 100%);
+      border: 1px solid rgba(0,229,255,0.25);
+      border-radius: 20px;
+      padding: 32px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+      box-shadow: 0 0 40px rgba(0,229,255,0.08), inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+
+    .hero-icon {
+      width: 90px;
+      height: 90px;
+      position: relative;
+    }
+
+    .hero-icon svg { width: 100%; height: 100%; }
+
+    .pulse-ring {
+      position: absolute;
+      inset: -8px;
+      border: 2px solid var(--cyan);
+      border-radius: 50%;
+      opacity: 0;
+      animation: pulseRing 2.4s ease-out infinite;
+    }
+    .pulse-ring:nth-child(2) { animation-delay: 0.8s; }
+    .pulse-ring:nth-child(3) { animation-delay: 1.6s; }
+
+    @keyframes pulseRing {
+      0%   { transform: scale(0.8); opacity: 0.7; }
+      100% { transform: scale(1.5); opacity: 0; }
+    }
+
+    .hero-title {
+      font-family: var(--font-head);
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--white);
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    .hero-desc {
+      font-size: 0.88rem;
+      color: rgba(232,244,255,0.6);
+      text-align: center;
+      line-height: 1.6;
+    }
+
+    /* ─── BUTTONS ─── */
+    .btn-primary {
+      width: 100%;
+      padding: 16px 24px;
+      background: linear-gradient(135deg, var(--blue), var(--cyan));
+      border: none;
+      border-radius: 14px;
+      color: #fff;
+      font-family: var(--font-head);
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      box-shadow: 0 0 24px rgba(0,229,255,0.4), 0 4px 16px rgba(0,0,0,0.4);
+      transition: transform 0.15s, box-shadow 0.15s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-primary::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.18), transparent);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 0 36px rgba(0,229,255,0.55), 0 6px 20px rgba(0,0,0,0.5); }
+    .btn-primary:hover::before { opacity: 1; }
+    .btn-primary:active { transform: translateY(0); }
+
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid rgba(0,229,255,0.35);
+      border-radius: 12px;
+      color: var(--cyan);
+      font-family: var(--font-body);
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 12px 24px;
+      cursor: pointer;
+      letter-spacing: 0.06em;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .btn-ghost:hover { background: rgba(0,229,255,0.08); border-color: var(--cyan); }
+
+    /* ─── SCANNER SCREEN ─── */
+    #screen-scanner { gap: 20px; padding-top: 10px; }
+
+    .scanner-title {
+      font-family: var(--font-head);
+      font-size: 0.85rem;
+      letter-spacing: 0.2em;
+      color: var(--cyan);
+      text-transform: uppercase;
+      animation: blink 1.6s ease infinite;
+    }
+    @keyframes blink { 50% { opacity: 0.4; } }
+
+    .cam-container {
+      position: relative;
+      width: 100%;
+      max-width: 360px;
+      border-radius: 20px;
+      overflow: hidden;
+      border: 2px solid rgba(0,229,255,0.4);
+      box-shadow: 0 0 40px rgba(0,229,255,0.2);
+    }
+
+    #video-el {
+      width: 100%;
+      display: block;
+      aspect-ratio: 1;
+      object-fit: cover;
+      background: var(--navy-2);
+    }
+
+    /* Corner guides */
+    .cam-corner {
+      position: absolute;
+      width: 36px;
+      height: 36px;
+      border-color: var(--cyan);
+      border-style: solid;
+      box-shadow: 0 0 10px var(--cyan);
+    }
+    .cam-corner.tl { top: 12px; left: 12px; border-width: 3px 0 0 3px; border-radius: 4px 0 0 0; }
+    .cam-corner.tr { top: 12px; right: 12px; border-width: 3px 3px 0 0; border-radius: 0 4px 0 0; }
+    .cam-corner.bl { bottom: 12px; left: 12px; border-width: 0 0 3px 3px; border-radius: 0 0 0 4px; }
+    .cam-corner.br { bottom: 12px; right: 12px; border-width: 0 3px 3px 0; border-radius: 0 0 4px 0; }
+
+    /* Scan line */
+    .scan-line {
+      position: absolute;
+      left: 10%;
+      right: 10%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+      box-shadow: 0 0 8px var(--cyan);
+      animation: scanLine 2.2s ease-in-out infinite;
+    }
+    @keyframes scanLine {
+      0%   { top: 15%; opacity: 1; }
+      45%  { top: 82%; opacity: 1; }
+      50%  { top: 82%; opacity: 0; }
+      55%  { top: 15%; opacity: 0; }
+      100% { top: 15%; opacity: 1; }
+    }
+
+    #canvas-el { display: none; }
+
+    /* ─── PLAYING SCREEN ─── */
+    #screen-playing { gap: 24px; padding-top: 14px; }
+
+    .mystery-badge {
+      font-family: var(--font-head);
+      font-size: 0.7rem;
+      letter-spacing: 0.3em;
+      color: var(--cyan);
+      background: rgba(0,229,255,0.1);
+      border: 1px solid rgba(0,229,255,0.3);
+      border-radius: 99px;
+      padding: 6px 18px;
+      text-transform: uppercase;
+    }
+
+    .waveform-wrap {
+      position: relative;
+      width: 100%;
+      height: 160px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Big music note */
+    .big-note {
+      font-size: 4.5rem;
+      opacity: 0.85;
+      filter: drop-shadow(0 0 20px var(--cyan));
+      animation: notePulse 1.8s ease-in-out infinite;
+    }
+    @keyframes notePulse {
+      0%, 100% { transform: scale(1) rotate(-5deg); }
+      50% { transform: scale(1.12) rotate(5deg); }
+    }
+
+    /* Bars */
+    .bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 5px;
+      height: 80px;
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .bar {
+      width: 6px;
+      background: linear-gradient(to top, var(--blue), var(--cyan));
+      border-radius: 3px 3px 0 0;
+      animation: barDance 0.8s ease-in-out infinite;
+      box-shadow: 0 0 6px var(--cyan);
+    }
+
+    .bar:nth-child(1)  { height: 28px; animation-delay: 0s; }
+    .bar:nth-child(2)  { height: 50px; animation-delay: 0.1s; }
+    .bar:nth-child(3)  { height: 70px; animation-delay: 0.2s; }
+    .bar:nth-child(4)  { height: 45px; animation-delay: 0.3s; }
+    .bar:nth-child(5)  { height: 65px; animation-delay: 0.15s; }
+    .bar:nth-child(6)  { height: 35px; animation-delay: 0.25s; }
+    .bar:nth-child(7)  { height: 55px; animation-delay: 0.05s; }
+    .bar:nth-child(8)  { height: 42px; animation-delay: 0.35s; }
+    .bar:nth-child(9)  { height: 68px; animation-delay: 0.18s; }
+    .bar:nth-child(10) { height: 30px; animation-delay: 0.28s; }
+
+    @keyframes barDance {
+      0%, 100% { transform: scaleY(1); }
+      50%       { transform: scaleY(0.3); }
+    }
+
+    .mystery-question {
+      font-family: var(--font-head);
+      font-size: 2.2rem;
+      font-weight: 900;
+      color: rgba(0,229,255,0.25);
+      letter-spacing: 0.3em;
+    }
+
+    /* Spotify iframe hidden */
+    .spotify-frame-wrap {
+      width: 100%;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 0 30px rgba(0,229,255,0.15);
+    }
+
+    .spotify-frame-wrap iframe {
+      width: 100%;
+      border: none;
+      display: block;
+      border-radius: 16px;
+    }
+
+    /* Reveal card */
+    .reveal-card {
+      width: 100%;
+      background: linear-gradient(145deg, rgba(0,229,255,0.08), rgba(13,47,255,0.1));
+      border: 1px solid rgba(0,229,255,0.2);
+      border-radius: 18px;
+      padding: 22px 20px;
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      animation: fadeUp 0.4s ease both;
+    }
+    .reveal-card.visible { display: flex; }
+
+    .reveal-label {
+      font-size: 0.72rem;
+      letter-spacing: 0.2em;
+      color: var(--cyan);
+      text-transform: uppercase;
+    }
+
+    .reveal-song {
+      font-family: var(--font-head);
+      font-size: 1.35rem;
+      font-weight: 900;
+      color: var(--white);
+      line-height: 1.2;
+    }
+
+    .reveal-artist {
+      font-size: 0.95rem;
+      color: rgba(232,244,255,0.65);
+      font-weight: 600;
+    }
+
+    .reveal-year {
+      font-size: 0.8rem;
+      color: rgba(232,244,255,0.35);
+      letter-spacing: 0.12em;
+    }
+
+    .actions-row {
+      display: flex;
+      gap: 12px;
+      width: 100%;
+    }
+
+    .actions-row .btn-primary { flex: 1; }
+    .actions-row .btn-ghost   { flex: 0 0 auto; }
+
+    /* ─── FOOTER ─── */
+    footer {
+      position: relative;
+      z-index: 10;
+      padding: 16px;
+      font-size: 0.72rem;
+      color: rgba(232,244,255,0.2);
+      letter-spacing: 0.1em;
+      text-align: center;
+    }
+
+    /* ─── ANIMATIONS ─── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(18px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ─── ERROR TOAST ─── */
+    #toast {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: rgba(255,60,60,0.12);
+      border: 1px solid rgba(255,60,60,0.4);
+      color: #ff8080;
+      font-family: var(--font-body);
+      font-size: 0.82rem;
+      padding: 10px 20px;
+      border-radius: 99px;
+      white-space: nowrap;
+      z-index: 100;
+      transition: transform 0.35s ease;
+      pointer-events: none;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+  <!-- ──────── HEADER ──────── -->
+  <header>
+    <div class="logo-wrap">
+      <!-- Logo Icon SVG -->
+      <svg class="logo-icon" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="starG" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#a0d8ff"/>
+            <stop offset="100%" stop-color="#00e5ff"/>
+          </linearGradient>
+          <linearGradient id="waveG" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#0d2fff"/>
+            <stop offset="100%" stop-color="#00e5ff"/>
+          </linearGradient>
+        </defs>
+        <!-- Star shape -->
+        <polygon points="50,5 61,35 92,35 68,54 77,84 50,65 23,84 32,54 8,35 39,35" fill="url(#starG)" opacity="0.9"/>
+        <!-- Play button -->
+        <polygon points="42,38 66,50 42,62" fill="white" opacity="0.9"/>
+        <!-- Music note -->
+        <text x="24" y="76" font-size="14" fill="white" opacity="0.6">♪</text>
+        <!-- Sparkles -->
+        <circle cx="15" cy="22" r="2.5" fill="#00e5ff" opacity="0.8"/>
+        <circle cx="83" cy="18" r="1.8" fill="#00e5ff" opacity="0.6"/>
+        <circle cx="88" cy="70" r="2" fill="#00e5ff" opacity="0.5"/>
+      </svg>
+
+      <div>
+        <div class="logo-text">HITHECTER</div>
+        <div class="logo-sub">El Juego de Música</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ──────── MAIN ──────── -->
+  <main>
+
+    <!-- SCREEN: LANDING -->
+    <div id="screen-landing" class="screen active">
+      <div class="hero-card">
+        <div class="hero-icon">
+          <div class="pulse-ring"></div>
+          <div class="pulse-ring"></div>
+          <div class="pulse-ring"></div>
+          <svg viewBox="0 0 90 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- QR icon -->
+            <rect x="10" y="10" width="28" height="28" rx="3" fill="none" stroke="#00e5ff" stroke-width="3"/>
+            <rect x="17" y="17" width="14" height="14" rx="1" fill="#00e5ff" opacity="0.7"/>
+            <rect x="52" y="10" width="28" height="28" rx="3" fill="none" stroke="#00e5ff" stroke-width="3"/>
+            <rect x="59" y="17" width="14" height="14" rx="1" fill="#00e5ff" opacity="0.7"/>
+            <rect x="10" y="52" width="28" height="28" rx="3" fill="none" stroke="#00e5ff" stroke-width="3"/>
+            <rect x="17" y="59" width="14" height="14" rx="1" fill="#00e5ff" opacity="0.7"/>
+            <!-- dots pattern -->
+            <rect x="52" y="52" width="5" height="5" rx="1" fill="#00e5ff" opacity="0.6"/>
+            <rect x="60" y="52" width="5" height="5" rx="1" fill="#00e5ff" opacity="0.6"/>
+            <rect x="68" y="52" width="5" height="5" rx="1" fill="#00e5ff" opacity="0.6"/>
+            <rect x="76" y="52" width="5" height="5" rx="1" fill="#00e5ff" opacity="0.6"/>
+            <rect x="52" y="60" width="5" height="5" rx="1" fill="#00e5ff" opacity="0.6"/>
+            <rect x="68" y="60" width="5" height="5" rx="1" fill="#00e5ff" opacity="0.6"/>
+            <rect x="52" y="68" width="5" height="5" rx="1" fill="#00e5ff" opacity="0.6"/>
+            <rect x="60" y="68" width="5" height="5" rx="1" fill="#00e5ff" opacity="0.6"/>
+            <rect x="76" y="68" width="5" height="5" rx="1" fill="#00e5ff" opacity="0.6"/>
+            <rect x="60" y="76" width="5" height="5" rx="1" fill="#00e5ff" opacity="0.6"/>
+            <rect x="68" y="76" width="5" height="5" rx="1" fill="#00e5ff" opacity="0.6"/>
+          </svg>
+        </div>
+        <div class="hero-title">¿Adivinas la canción?</div>
+        <div class="hero-desc">Escanea una tarjeta Hithecter y escucha la música antes de revelar el título. ¡Demuestra cuánto sabes!</div>
+      </div>
+
+      <button class="btn-primary" id="btn-start-scan">
+        📷 &nbsp; ESCANEAR TARJETA
+      </button>
+    </div>
+
+    <!-- SCREEN: SCANNER -->
+    <div id="screen-scanner" class="screen">
+      <div class="scanner-title">🎵 &nbsp; Apunta al código QR</div>
+
+      <div class="cam-container">
+        <video id="video-el" playsinline autoplay muted></video>
+        <div class="cam-corner tl"></div>
+        <div class="cam-corner tr"></div>
+        <div class="cam-corner bl"></div>
+        <div class="cam-corner br"></div>
+        <div class="scan-line"></div>
+      </div>
+
+      <canvas id="canvas-el"></canvas>
+
+      <button class="btn-ghost" id="btn-cancel-scan">✕ &nbsp; Cancelar</button>
+    </div>
+
+    <!-- SCREEN: PLAYING -->
+    <div id="screen-playing" class="screen">
+      <div class="mystery-badge">🔒 CANCIÓN MISTERIOSA</div>
+
+      <div class="waveform-wrap">
+        <div class="big-note">🎵</div>
+        <div class="bars">
+          <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+          <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+          <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+          <div class="bar"></div>
+        </div>
+      </div>
+
+      <div class="mystery-question">? ? ?</div>
+
+      <!-- Spotify embed -->
+      <div class="spotify-frame-wrap" id="spotify-wrap">
+        <iframe id="spotify-iframe"
+          src=""
+          height="80"
+          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+          loading="lazy">
+        </iframe>
+      </div>
+
+      <!-- Revealed info (hidden until button press) -->
+      <div class="reveal-card" id="reveal-card">
+        <div class="reveal-label">🎤 Canción revelada</div>
+        <div class="reveal-song" id="reveal-song">—</div>
+        <div class="reveal-artist" id="reveal-artist">—</div>
+        <div class="reveal-year" id="reveal-year">—</div>
+      </div>
+
+      <div class="actions-row">
+        <button class="btn-primary" id="btn-reveal">🔓 &nbsp; REVELAR CANCIÓN</button>
+        <button class="btn-ghost" id="btn-scan-again">↩</button>
+      </div>
+    </div>
+
+  </main>
+
+  <footer>HITHECTER &copy; 2026 &nbsp;·&nbsp; El Juego de Música</footer>
+  <div id="toast"></div>
+
+  <script>
+    // ── Elements ──
+    const screens     = { landing: document.getElementById('screen-landing'), scanner: document.getElementById('screen-scanner'), playing: document.getElementById('screen-playing') };
+    const videoEl     = document.getElementById('video-el');
+    const canvasEl    = document.getElementById('canvas-el');
+    const spotifyIframe = document.getElementById('spotify-iframe');
+    const revealCard  = document.getElementById('reveal-card');
+    const revealSong  = document.getElementById('reveal-song');
+    const revealArtist= document.getElementById('reveal-artist');
+    const revealYear  = document.getElementById('reveal-year');
+    const toast       = document.getElementById('toast');
+
+    let stream        = null;
+    let scanInterval  = null;
+    let songData      = null;
+
+    // ── Screen switcher ──
+    function showScreen(name) {
+      Object.values(screens).forEach(s => s.classList.remove('active'));
+      screens[name].classList.add('active');
+    }
+
+    // ── Toast ──
+    function showToast(msg, ms = 3000) {
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), ms);
+    }
+
+    // ── Start camera + scan ──
+    async function startScanner() {
+      showScreen('scanner');
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 1280 } }
+        });
+        videoEl.srcObject = stream;
+        await videoEl.play();
+        requestAnimationFrame(tick);
+      } catch (err) {
+        showScreen('landing');
+        showToast('⚠️ No se pudo acceder a la cámara');
+      }
+    }
+
+    // ── Stop camera ──
+    function stopScanner() {
+      if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+      cancelAnimationFrame(scanInterval);
+    }
+
+    // ── QR scan tick ──
+    function tick() {
+      if (videoEl.readyState === videoEl.HAVE_ENOUGH_DATA) {
+        canvasEl.width  = videoEl.videoWidth;
+        canvasEl.height = videoEl.videoHeight;
+        const ctx = canvasEl.getContext('2d');
+        ctx.drawImage(videoEl, 0, 0);
+        const img = ctx.getImageData(0, 0, canvasEl.width, canvasEl.height);
+        const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+        if (code) {
+          handleQR(code.data);
+          return; // stop loop
+        }
+      }
+      scanInterval = requestAnimationFrame(tick);
+    }
+
+    // ── Parse bopster/hithecter QR format ──
+    // Formats supported:
+    //   https://open.spotify.com/track/TRACKID|Title|Artist|Year|style
+    //   https://open.spotify.com/track/TRACKID
+    function handleQR(raw) {
+      stopScanner();
+
+      // Vibrate if supported
+      if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
+
+      let trackId = null, title = '?', artist = '?', year = '?';
+
+      if (raw.includes('|')) {
+        const parts = raw.split('|');
+        const url   = parts[0].trim();
+        title  = parts[1] ? parts[1].trim() : '?';
+        artist = parts[2] ? parts[2].trim() : '?';
+        year   = parts[3] ? parts[3].trim() : '?';
+        trackId = extractTrackId(url);
+      } else if (raw.includes('spotify.com/track/')) {
+        trackId = extractTrackId(raw);
+      }
+
+      if (!trackId) {
+        showToast('❌ QR no reconocido — usa una tarjeta Hithecter');
+        showScreen('landing');
+        startScanner(); // retry
+        return;
+      }
+
+      songData = { trackId, title, artist, year };
+
+      // Reset reveal
+      revealCard.classList.remove('visible');
+      document.getElementById('btn-reveal').style.display = '';
+
+      // Load Spotify embed
+      spotifyIframe.src = `https://open.spotify.com/embed/track/${trackId}?utm_source=generator&autoplay=1&theme=0`;
+
+      // Fill reveal data (hidden)
+      revealSong.textContent   = title;
+      revealArtist.textContent = artist;
+      revealYear.textContent   = year;
+
+      showScreen('playing');
+    }
+
+    function extractTrackId(url) {
+      const m = url.match(/track\/([A-Za-z0-9]+)/);
+      return m ? m[1] : null;
+    }
+
+    // ── Buttons ──
+    document.getElementById('btn-start-scan').addEventListener('click', startScanner);
+
+    document.getElementById('btn-cancel-scan').addEventListener('click', () => {
+      stopScanner();
+      showScreen('landing');
+    });
+
+    document.getElementById('btn-reveal').addEventListener('click', () => {
+      revealCard.classList.add('visible');
+      document.getElementById('btn-reveal').style.display = 'none';
+    });
+
+    document.getElementById('btn-scan-again').addEventListener('click', () => {
+      spotifyIframe.src = '';
+      revealCard.classList.remove('visible');
+      startScanner();
+    });
+  </script>
+</body>
+</html>
